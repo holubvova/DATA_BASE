@@ -3,20 +3,30 @@ import time
 from psycopg2 import errors
 
 
-def DELL_REQUEST(name_table,colum):
+def DELL_REQUEST(name_table):
+    colum = ''
+    for x in DATA.data_DELL:
+        if x == name_table:
+            colum = DATA.data_DELL[x]
+            break
+    if colum == '':
+        return 'error'
     query = f''' DELETE FROM {name_table}  WHERE {colum} = %s ;'''
     return query
 
 def UPDATE_REQUEST(name_table,colum_name_set):
+  #  print(colum_name_set)
     for x in DATA.data:
         if x == name_table:
-            colums,count = list_to_other(DATA.data[x])
-    if count == 2:
-        query = f''' UPDATE {name_table} set {colum_name_set[0]}  = %s   WHERE {colum_name_set[2]}  = %s ; '''
+            colums = DATA.data_DELL[x]
+           # tmp,count = list_to_other((DATA.data[x]))
+    count = len(colum_name_set)
     if count == 3:
-        query = f''' UPDATE {name_table} set {colum_name_set[0]}  = %s, {colum_name_set[2]}  = %s  WHERE {colum_name_set[6]}  = %s ; '''
-    if count == 4:
-        query = f''' UPDATE {name_table} set {colum_name_set[0]}  = %s, {colum_name_set[2]}  = %s , {colum_name_set[6]}  = %s  WHERE {colum_name_set[8]}  = %s ; '''
+        query = f''' UPDATE {name_table} set {colum_name_set[0]}  = %s   WHERE {colums}  = %s ; '''
+    if count == 5:
+        query = f''' UPDATE {name_table} set {colum_name_set[0]}  = %s, {colum_name_set[2]}  = %s  WHERE {colums}  = %s ; '''
+    if count == 7:
+        query = f''' UPDATE {name_table} set {colum_name_set[0]}  = %s, {colum_name_set[2]}  = %s , {colum_name_set[4]}  = %s  WHERE {colums}  = %s ; '''
 
     return query
 
@@ -42,57 +52,90 @@ def INSERT_REQUEST(name_table):
         for i in range(0,count):
             end =  end +'%s,'
         end ='(' + end[:-1]+')'
+       # print(INSERT + name_table + colums + VAL + end)
         return INSERT + name_table + colums + VAL + end
     except (Exception,TypeError):
         print ('error')
+        return -1
 
 
 def Insert(conn,cur,name_table,tmp):
-    data = tmp
-    postgres_insert_query = INSERT_REQUEST(name_table)
-    colums, count = list_to_other(DATA.data[name_table])
-    check = count
-    if check ==  2:
-        record_to_insert = (data[0], data[1])
-    elif check == 3:
-        record_to_insert = (data[0], data[1], data[2])
-    elif check == 4:
-        record_to_insert = (data[0], data[1], data[2], data[3])
-    # print(INSERT_REQUEST('journal_of_books'))
     try:
+        data = tmp
+        error_test = True
+        for x in DATA.data:
+            if x == name_table:
+                error_test = False
+        if   error_test:
+            print("error")
+            return 4
+
+        postgres_insert_query = INSERT_REQUEST(name_table)
+        colums, count = list_to_other(DATA.data[name_table])
+        check = count
+
+        if check == 1:
+            record_to_insert = (data[0],)
+        if check ==  2:
+            record_to_insert = (data[0], data[1])
+        elif check == 3:
+            record_to_insert = (data[0], data[1], data[2])
+        #print(INSERT_REQUEST('books'))
+
         cur.execute(postgres_insert_query, record_to_insert)
     except Exception:
         print("error")
+        return -1
     else:
         conn.commit()
 
-def DELL(conn,cur,name_table,name_colum,id):
-    postgres_delte = DELL_REQUEST(name_table,name_colum)
-    postgres_delte = str(postgres_delte)
-    delete = (id,)
+
+def DELL(conn,cur,name_table,id):
     try:
+        error_test = True
+        for x in DATA.data:
+            if x == name_table:
+                error_test = False
+        if error_test:
+            print("error")
+            return 4
+        postgres_delte = DELL_REQUEST(name_table)
+        postgres_delte = str(postgres_delte)
+        delete = (id,)
+        #print(postgres_delte,delete)
+
         cur.execute(postgres_delte,delete)
     except Exception:
         print("error")
+        return
     else:
         conn.commit()
 
 
 def Update(conn,cur,name_table,tmp):
-    postgre_update = UPDATE_REQUEST(name_table,tmp)
-    count = len(tmp)
-    print(tmp)
-    if count == 4:
-        postgre_update_values = (tmp[1], tmp[3])
-    elif count == 6:
-        postgre_update_values = (tmp[1], tmp[3], tmp[5])
-    elif count == 8:
-        postgre_update_values = (tmp[1], tmp[3],tmp[5], tmp[7])
-    print(postgre_update)
     try:
+        error_test = True
+        for x in DATA.data:
+            if x == name_table:
+                error_test = False
+        if error_test:
+            print("error")
+            return 4
+        postgre_update = UPDATE_REQUEST(name_table,tmp)
+        count = len(tmp)
+        #print(tmp)
+        if count == 3:
+            postgre_update_values = (tmp[1], tmp[-1])
+        elif count == 5:
+            postgre_update_values = (tmp[1], tmp[3], tmp[-1])
+        elif count == 7:
+            postgre_update_values = (tmp[1], tmp[3],tmp[5], tmp[-1])
+       # print(postgre_update)
+
         cur.execute(postgre_update,postgre_update_values)
     except Exception:
         print("error")
+        return
     else:
         conn.commit()
 
@@ -106,45 +149,39 @@ def Generate(conn ,cur,count, table_name):
             sql = DATA.generate[x]
             break
     if sql == "":
+        print("input correct data")
+        return "input correct data"
+    try:
+        count = int(count)
+    except (TypeError,ValueError):
+        print ("input correct data")
         return
-    while end:
-        try:
-            while i < int(count):
-                cur.execute(sql)
-                i +=1
-            if i == count :
-                end = False
-        except errors.ForeignKeyViolation:
-               print(errors.ForeignKeyViolation)
-        finally:
-             conn.commit()
-             if end == False:
-                 cur.execute(f'select * from {table_name}')
-                 row = cur.fetchall()
-                 print("after generate")
-                 for x in DATA.data:
-                     if x == table_name:
-                         print(DATA.data[x])
-                         break
+    try:
+        while i < count:
+            cur.execute(sql)
+            i +=1
+        if i == count :
+            end = False
+    except errors.ForeignKeyViolation:
+          print( "input correct data")
+          raise
+    finally:
+         conn.commit()
+         return 1
 
-                 for x in row:
-                     print(x)
-                 return 1
-             continue
 
 def generate_big(conn, cur, count,mod):
     end = True
     i = 0
     if mod == '1':
-        sql = 'INSERT INTO author ( author_name) select chr(trunc(65 + random()*20)::int)||chr(trunc(65 + random()*20)::int)' \
-              ' || chr(trunc(65 + random()*20)::int)||chr(trunc(65 + random()*20)::int) || chr(trunc(65 + random()*20)::int)||chr(trunc(65 + random()*20)::int)' \
-              '|| chr(trunc(65 + random()*20)::int)||chr(trunc(65 + random()*20)::int)|| chr(trunc(65 + random()*20)::int)||chr(trunc(65 + random()*20)::int)||' \
-              'chr(trunc(65 + random()*20)::int)||chr(trunc(65 + random()*20)::int)|| chr(trunc(65 + random()*20)::int)||chr(trunc(65 + random()*20)::int)'
+        sql = 'INSERT INTO id_genry (genry) select chr(trunc(65 + random()*25)::int)|| chr(trunc(65 + random()*25)::int)' \
+              ' || chr(trunc(65 + random()*25)::int) || chr(trunc(65 + random()*25)::int) ' \
+              '|| chr(trunc(65 + random()*25)::int ) limit  1 '
     elif mod =='2':
-        sql = 'INSERT INTO books ( book_id ) select chr(trunc(65 + random()*20)::int)||chr(trunc(65 + random()*20)::int)' \
-              ' || chr(trunc(65 + random()*20)::int)||chr(trunc(65 + random()*20)::int) || chr(trunc(65 + random()*20)::int)||chr(trunc(65 + random()*20)::int)' \
-              '|| chr(trunc(65 + random()*20)::int)||chr(trunc(65 + random()*20)::int)|| chr(trunc(65 + random()*20)::int)||chr(trunc(65 + random()*20)::int)||' \
-              'chr(trunc(65 + random()*20)::int)||chr(trunc(65 + random()*20)::int)|| chr(trunc(65 + random()*20)::int)||chr(trunc(65 + random()*20)::int)'
+        sql = "INSERT INTO readers(name,surname,phone_number) select chr(trunc(65 + random()*25)::int)|| chr(trunc(65 + random()*25)::int)||" \
+              " chr(trunc(65 + random()*25)::int)," \
+              "chr(trunc(65 + random()*25)::int)|| chr(trunc(65 + random()*15)::int) || chr(trunc(65 + random()*30)::int)," \
+              "trunc(random()*100000000)::int limit 1"
     else :
         return -1
     while end:
@@ -160,48 +197,44 @@ def generate_big(conn, cur, count,mod):
             conn.commit()
             continue
 
-    #author of a book that was read over time
-def First_request(conn, cur,date_from,date_to):
-    sql = f'''select public.author.author_name from public.author where public.author.autor_id in
-                ( select public.author_details.author_id from public.author_details where public.author_details.book_id in
-                ( select public.journal_of_books.book_id from public.journal_of_books 
-                    where public.journal_of_books.date_from > '{date_from}' and public.journal_of_books.date_to < '{date_to}'))'''
+def First_request(conn, cur):
+    sql = f'''select j.id_records , r.name , b.name_book ,g.genry
+        from public.journal j inner join public.readers r on j.id_readers = r.id_readers 
+        inner join public.books b on j.id_books = b.id_boooks 
+        inner join  public.id_genry g on b.genry = g.id_genry'''
     try:
         start = int(round(time.time() * 1000))
         cur.execute(sql)
         end = int(round(time.time() * 1000)) - start
-        return end, cur.fetchone()
+        return end, cur.fetchall()
     finally:
         conn.commit()
 
 #shows the date of birth of the reader who took the oldest book
 def Second_request(conn, cur):
-    sql = f'''select public.names.birthday from public.names where public.names.id_name in
-                (select public.journal_of_books.id_name from public.journal_of_books where public.journal_of_books.book_id in
-                (select public.books_name.book_id from public.books_name where public.books_name.years_print in  
-                (select MIN(public.books_name.years_print) from public.books_name)))'''
+    sql = f'''select public.readers.name from public.readers where public.readers.id_readers =(
+                (select public.journal.id_readers from public.journal where public.journal.data_time in 
+                (select  MIN (public.journal.data_time) from public.journal )))'''
     try:
         start = int(round(time.time() * 1000))
         cur.execute(sql)
         end = int(round(time.time() * 1000)) - start
-        return end, cur.fetchone()
+        return end, cur.fetchall()
     finally:
         conn.commit()
-#displays the genre of books written by the author
-def Third_request(conn, cur,author):
-    sql = f'''select public.genryy.genry from public.genryy where public.genryy.genry_id in
-                (select public.books_details.genry_id from public.books_details where public.books_details.book_id in
-                (select public.author_details.book_id from public.author_details where public.author_details.author_id in 
-                (select public.author.autor_id from public.author where public.author.author_name like '{author}')))'''
+#
+def Third_request(conn, cur,genry):
+    sql = f'''select public.readers.name from public.readers where public.readers.id_readers in (
+            (select public.journal.id_readers from public.journal where public.journal.id_books in
+            (select public.books.id_boooks from public.books where public.books.genry in
+             (select public.id_genry.id_genry from public.id_genry  where public.id_genry.genry LIKE  '{genry}'))))'''
     try:
         start = int(round(time.time() * 1000))
         cur.execute(sql)
         end = int(round(time.time() * 1000)) - start
-        return end, cur.fetchone()
+        return end, cur.fetchall()
+    except errors :
+        print('error')
     finally:
         conn.commit()
-
-
-
-
 
